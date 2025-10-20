@@ -59,9 +59,9 @@ pipeline {
             steps {
                 script {
                     echo 'Updating Kubernetes deployment files...'
-                    bat """
-                        sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${APP_NAME}:${params.DEPLOYMENT_TYPE}|g' k8s/deployment-${params.DEPLOYMENT_TYPE}.yaml
-                    """
+                    bat '''
+                        powershell -Command "(Get-Content k8s/deployment-green.yaml) -replace 'image: .*', 'image: wolfie8935/myapp:green' | Set-Content k8s/deployment-green.yaml"
+                        '''
                 }
             }
         }
