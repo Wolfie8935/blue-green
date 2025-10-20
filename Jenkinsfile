@@ -2,9 +2,9 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_REGISTRY = '<YOUR_DOCKER_REGISTRY>'
-        DOCKER_CREDENTIALS = 'docker-hub-credentials' // Jenkins credential ID
-        KUBECONFIG_CREDENTIALS = 'kubeconfig-credentials' // Jenkins credential ID
+        DOCKER_REGISTRY = 'wolfie8935'
+        DOCKER_CREDENTIALS = 'docker-hub-credentials'
+        KUBECONFIG_CREDENTIALS = 'kubeconfig-credentials'
         APP_NAME = 'myapp'
         NAMESPACE = 'production'
     }
@@ -44,7 +44,7 @@ pipeline {
             steps {
                 script {
                     echo 'Pushing Docker image to registry...'
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
+                    docker.withRegistry('', "${DOCKER_CREDENTIALS}") {
                         dockerImage.push("${params.DEPLOYMENT_TYPE}-${BUILD_NUMBER}")
                         dockerImage.push("${params.DEPLOYMENT_TYPE}")
                     }
@@ -93,13 +93,8 @@ pipeline {
                     echo "Running smoke tests on ${params.DEPLOYMENT_TYPE} environment..."
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
                         sh """
-                            # Get pod name
                             POD_NAME=\$(kubectl get pods -n ${NAMESPACE} -l version=${params.DEPLOYMENT_TYPE} -o jsonpath='{.items[0].metadata.name}')
-                            
-                            # Check if pod is running
                             kubectl wait --for=condition=ready pod/\$POD_NAME -n ${NAMESPACE} --timeout=120s
-                            
-                            # Run health check
                             kubectl exec \$POD_NAME -n ${NAMESPACE} -- curl -f http://localhost:3000/health || exit 1
                         """
                     }
@@ -115,15 +110,12 @@ pipeline {
                 script {
                     echo "Switching traffic to ${params.DEPLOYMENT_TYPE} environment..."
                     
-                    // Get user approval before switching traffic
                     input message: "Switch traffic to ${params.DEPLOYMENT_TYPE}?", ok: 'Deploy'
                     
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
                         sh """
-                            # Switch service selector to new version
                             kubectl patch service app-service -n ${NAMESPACE} -p '{"spec":{"selector":{"version":"${params.DEPLOYMENT_TYPE}"}}}'
                             
-                            # Scale down the old environment
                             OLD_ENV=\$([ "${params.DEPLOYMENT_TYPE}" == "green" ] && echo "blue" || echo "green")
                             kubectl scale deployment myapp-\$OLD_ENV -n ${NAMESPACE} --replicas=1
                         """
@@ -145,14 +137,11 @@ pipeline {
                     
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
                         sh """
-                            # Scale up the rollback environment
                             kubectl scale deployment myapp-${rollbackEnv} -n ${NAMESPACE} --replicas=3
                             kubectl rollout status deployment/myapp-${rollbackEnv} -n ${NAMESPACE} --timeout=300s
                             
-                            # Switch traffic back
                             kubectl patch service app-service -n ${NAMESPACE} -p '{"spec":{"selector":{"version":"${rollbackEnv}"}}}'
                             
-                            # Scale down current environment
                             kubectl scale deployment myapp-${params.DEPLOYMENT_TYPE} -n ${NAMESPACE} --replicas=0
                         """
                     }
@@ -166,30 +155,12 @@ pipeline {
     post {
         success {
             echo 'Pipeline completed successfully!'
-            // Add notifications (Slack, email, etc.)
         }
         failure {
             echo 'Pipeline failed!'
-            // Add notifications for failures
         }
         always {
             cleanWs()
         }
     }
 }
-```
-
----
-
-## **Step 6: Implementation Steps**
-
-### **Prerequisites:**
-
-1. **Jenkins Setup:**
-   - Install Jenkins with Docker and Kubernetes plugins
-   - Install required plugins: Docker Pipeline, Kubernetes CLI, Pipeline
-
-2. **Add Jenkins Credentials:**
-```
-   - Docker Hub credentials (ID: docker-hub-credentials)
-   - Kubeconfig file (ID: kubeconfig-credentials)
