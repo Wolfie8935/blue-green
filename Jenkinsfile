@@ -23,10 +23,13 @@ pipeline {
         }
         
         stage('Build Docker Image') {
+            when {
+                expression { params.ACTION == 'deploy' }
+            }
             steps {
                 script {
                     echo 'Building Docker image for green environment...'
-                    dir('app') {  // <-- change this
+                    dir('app/src') {
                         bat 'docker build -t "wolfie8935/myapp:green-2" .'
                     }
                 }
