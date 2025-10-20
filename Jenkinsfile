@@ -1,165 +1,80 @@
 pipeline {
     agent any
-    
+
     environment {
-        DOCKER_REGISTRY = 'wolfie8935'
-        DOCKER_CREDENTIALS = 'docker-hub-credentials'
-        KUBECONFIG_CREDENTIALS = 'kubeconfig-credentials'
-        APP_NAME = 'myapp'
-        NAMESPACE = 'production'
+        REGISTRY_CREDENTIALS = credentials('dockerhub-credentials')
+        DOCKER_IMAGE_NAME = "wolfie8935/myapp"
+        GREEN_TAG = "green-2"
+        KUBE_CONFIG = credentials('kubeconfig')
     }
-    
-    parameters {
-        choice(name: 'DEPLOYMENT_TYPE', choices: ['green', 'blue'], description: 'Select deployment environment')
-        choice(name: 'ACTION', choices: ['deploy', 'rollback'], description: 'Select action')
-    }
-    
+
     stages {
+
         stage('Checkout') {
             steps {
                 echo 'Checking out code...'
-                checkout scm
+                git 'https://github.com/Wolfie8935/blue-green.git'
             }
         }
-        
+
         stage('Build Docker Image') {
-            when {
-                expression { params.ACTION == 'deploy' }
-            }
             steps {
-                script {
-                    echo 'Building Docker image for green environment...'
-                    dir('app/src') {
-                        bat 'docker build -t "wolfie8935/myapp:green-2" .'
+                dir('app/src') {
+                    script {
+                        echo "Building Docker image for green environment..."
+                        dockerImage = docker.build("${DOCKER_IMAGE_NAME}:${GREEN_TAG}")
                     }
                 }
             }
         }
-        
+
         stage('Push Docker Image') {
-            when {
-                expression { params.ACTION == 'deploy' }
-            }
             steps {
                 script {
-                    echo 'Pushing Docker image to registry...'
-                    docker.withRegistry('', "${DOCKER_CREDENTIALS}") {
-                        dockerImage.push("${params.DEPLOYMENT_TYPE}-${BUILD_NUMBER}")
-                        dockerImage.push("${params.DEPLOYMENT_TYPE}")
+                    echo "Pushing Docker image to registry..."
+                    docker.withRegistry('https://index.docker.io/v1/', REGISTRY_CREDENTIALS) {
+                        dockerImage.push()
                     }
                 }
             }
         }
-        
+
         stage('Update Kubernetes Manifests') {
-            when {
-                expression { params.ACTION == 'deploy' }
-            }
             steps {
-                script {
-                    echo 'Updating Kubernetes deployment files...'
-                    sh """
-                        sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${APP_NAME}:${params.DEPLOYMENT_TYPE}|g' k8s/deployment-${params.DEPLOYMENT_TYPE}.yaml
-                    """
-                }
+                echo "Updating Kubernetes manifests..."
+                // Example: sed or yq update of image tag
+                bat "kubectl set image deployment/myapp myapp=${DOCKER_IMAGE_NAME}:${GREEN_TAG} --kubeconfig=${KUBE_CONFIG}"
             }
         }
-        
+
         stage('Deploy to Kubernetes') {
-            when {
-                expression { params.ACTION == 'deploy' }
-            }
             steps {
-                script {
-                    echo "Deploying to ${params.DEPLOYMENT_TYPE} environment..."
-                    withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
-                            kubectl apply -f k8s/namespace.yaml
-                            kubectl apply -f k8s/deployment-${params.DEPLOYMENT_TYPE}.yaml
-                            kubectl rollout status deployment/myapp-${params.DEPLOYMENT_TYPE} -n ${NAMESPACE} --timeout=300s
-                        """
-                    }
-                }
+                echo "Deploying to Kubernetes cluster..."
+                bat "kubectl rollout restart deployment/myapp --kubeconfig=${KUBE_CONFIG}"
             }
         }
-        
+
         stage('Run Smoke Tests') {
-            when {
-                expression { params.ACTION == 'deploy' }
-            }
             steps {
-                script {
-                    echo "Running smoke tests on ${params.DEPLOYMENT_TYPE} environment..."
-                    withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
-                            POD_NAME=\$(kubectl get pods -n ${NAMESPACE} -l version=${params.DEPLOYMENT_TYPE} -o jsonpath='{.items[0].metadata.name}')
-                            kubectl wait --for=condition=ready pod/\$POD_NAME -n ${NAMESPACE} --timeout=120s
-                            kubectl exec \$POD_NAME -n ${NAMESPACE} -- curl -f http://localhost:3000/health || exit 1
-                        """
-                    }
-                }
+                echo "Running smoke tests..."
+                bat "curl -f http://<your-app-endpoint>:3000 || exit 1"
             }
         }
-        
+
         stage('Switch Traffic') {
-            when {
-                expression { params.ACTION == 'deploy' }
-            }
             steps {
-                script {
-                    echo "Switching traffic to ${params.DEPLOYMENT_TYPE} environment..."
-                    
-                    input message: "Switch traffic to ${params.DEPLOYMENT_TYPE}?", ok: 'Deploy'
-                    
-                    withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
-                            kubectl patch service app-service -n ${NAMESPACE} -p '{"spec":{"selector":{"version":"${params.DEPLOYMENT_TYPE}"}}}'
-                            
-                            OLD_ENV=\$([ "${params.DEPLOYMENT_TYPE}" == "green" ] && echo "blue" || echo "green")
-                            kubectl scale deployment myapp-\$OLD_ENV -n ${NAMESPACE} --replicas=1
-                        """
-                    }
-                    
-                    echo "Traffic successfully switched to ${params.DEPLOYMENT_TYPE}!"
-                }
-            }
-        }
-        
-        stage('Rollback') {
-            when {
-                expression { params.ACTION == 'rollback' }
-            }
-            steps {
-                script {
-                    def rollbackEnv = params.DEPLOYMENT_TYPE == 'green' ? 'blue' : 'green'
-                    echo "Rolling back to ${rollbackEnv} environment..."
-                    
-                    withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
-                            kubectl scale deployment myapp-${rollbackEnv} -n ${NAMESPACE} --replicas=3
-                            kubectl rollout status deployment/myapp-${rollbackEnv} -n ${NAMESPACE} --timeout=300s
-                            
-                            kubectl patch service app-service -n ${NAMESPACE} -p '{"spec":{"selector":{"version":"${rollbackEnv}"}}}'
-                            
-                            kubectl scale deployment myapp-${params.DEPLOYMENT_TYPE} -n ${NAMESPACE} --replicas=0
-                        """
-                    }
-                    
-                    echo "Successfully rolled back to ${rollbackEnv}!"
-                }
+                echo "Switching traffic to green deployment..."
+                // Add your load balancer or Ingress switch here
             }
         }
     }
-    
+
     post {
-        success {
-            echo 'Pipeline completed successfully!'
-        }
         failure {
             echo 'Pipeline failed!'
         }
-        always {
-            cleanWs()
+        success {
+            echo 'Pipeline completed successfully!'
         }
     }
 }
