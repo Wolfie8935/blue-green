@@ -22,7 +22,7 @@ pipeline {
             }
         }
         
-        sstage('Build Docker Image') {
+        stage('Build Docker Image') {
             when {
                 expression { params.ACTION == 'deploy' }
             }
