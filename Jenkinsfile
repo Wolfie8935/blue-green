@@ -59,7 +59,7 @@ pipeline {
             steps {
                 script {
                     echo 'Updating Kubernetes deployment files...'
-                    sh """
+                    bat """
                         sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${APP_NAME}:${params.DEPLOYMENT_TYPE}|g' k8s/deployment-${params.DEPLOYMENT_TYPE}.yaml
                     """
                 }
@@ -74,7 +74,7 @@ pipeline {
                 script {
                     echo "Deploying to ${params.DEPLOYMENT_TYPE} environment..."
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
+                        bat """
                             kubectl apply -f k8s/namespace.yaml
                             kubectl apply -f k8s/deployment-${params.DEPLOYMENT_TYPE}.yaml
                             kubectl rollout status deployment/myapp-${params.DEPLOYMENT_TYPE} -n ${NAMESPACE} --timeout=300s
@@ -92,7 +92,7 @@ pipeline {
                 script {
                     echo "Running smoke tests on ${params.DEPLOYMENT_TYPE} environment..."
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
+                        bat """
                             POD_NAME=\$(kubectl get pods -n ${NAMESPACE} -l version=${params.DEPLOYMENT_TYPE} -o jsonpath='{.items[0].metadata.name}')
                             kubectl wait --for=condition=ready pod/\$POD_NAME -n ${NAMESPACE} --timeout=120s
                             kubectl exec \$POD_NAME -n ${NAMESPACE} -- curl -f http://localhost:3000/health || exit 1
@@ -113,7 +113,7 @@ pipeline {
                     input message: "Switch traffic to ${params.DEPLOYMENT_TYPE}?", ok: 'Deploy'
                     
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
+                        bat """
                             kubectl patch service app-service -n ${NAMESPACE} -p '{"spec":{"selector":{"version":"${params.DEPLOYMENT_TYPE}"}}}'
                             
                             OLD_ENV=\$([ "${params.DEPLOYMENT_TYPE}" == "green" ] && echo "blue" || echo "green")
@@ -136,7 +136,7 @@ pipeline {
                     echo "Rolling back to ${rollbackEnv} environment..."
                     
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
-                        sh """
+                        bat """
                             kubectl scale deployment myapp-${rollbackEnv} -n ${NAMESPACE} --replicas=3
                             kubectl rollout status deployment/myapp-${rollbackEnv} -n ${NAMESPACE} --timeout=300s
                             
