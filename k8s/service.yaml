@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+  namespace: production
+spec:
+  type: LoadBalancer
+  selector:
+    app: myapp
+    version: blue  # This will be switched between blue and green
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
