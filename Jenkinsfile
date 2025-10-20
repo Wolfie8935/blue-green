@@ -23,15 +23,11 @@ pipeline {
         }
         
         stage('Build Docker Image') {
-            when {
-                expression { params.ACTION == 'deploy' }
-            }
             steps {
                 script {
-                    echo "Building Docker image for ${params.DEPLOYMENT_TYPE} environment..."
-                    dir('app/src') {
-                        dockerImage = docker.build("${DOCKER_REGISTRY}/${APP_NAME}:${params.DEPLOYMENT_TYPE}-${BUILD_NUMBER}")
-                        dockerImage.tag("${params.DEPLOYMENT_TYPE}")
+                    echo 'Building Docker image for green environment...'
+                    dir('app') {  // <-- change this
+                        bat 'docker build -t "wolfie8935/myapp:green-2" .'
                     }
                 }
             }
