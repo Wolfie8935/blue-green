@@ -93,9 +93,9 @@ pipeline {
                     echo "Running smoke tests on ${params.DEPLOYMENT_TYPE} environment..."
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
                         bat """
-                            POD_NAME=\$(kubectl get pods -n ${NAMESPACE} -l version=${params.DEPLOYMENT_TYPE} -o jsonpath='{.items[0].metadata.name}')
-                            kubectl wait --for=condition=ready pod/\$POD_NAME -n ${NAMESPACE} --timeout=120s
-                            kubectl exec \$POD_NAME -n ${NAMESPACE} -- curl -f http://localhost:3000/health || exit 1
+                            for /f "delims=" %%i in ('kubectl get pods -n ${NAMESPACE} -l version=${params.DEPLOYMENT_TYPE} -o jsonpath^="{.items[0].metadata.name}"') do set POD_NAME=%%i
+                            kubectl wait --for=condition=ready pod/%POD_NAME% -n ${NAMESPACE} --timeout=120s
+                            kubectl exec %POD_NAME% -n ${NAMESPACE} -- curl -f http://localhost:3000/health
                         """
                     }
                 }
@@ -113,11 +113,10 @@ pipeline {
                     input message: "Switch traffic to ${params.DEPLOYMENT_TYPE}?", ok: 'Deploy'
                     
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
+                        def oldEnv = params.DEPLOYMENT_TYPE == 'green' ? 'blue' : 'green'
                         bat """
-                            kubectl patch service app-service -n ${NAMESPACE} -p '{"spec":{"selector":{"version":"${params.DEPLOYMENT_TYPE}"}}}'
-                            
-                            OLD_ENV=\$([ "${params.DEPLOYMENT_TYPE}" == "green" ] && echo "blue" || echo "green")
-                            kubectl scale deployment myapp-\$OLD_ENV -n ${NAMESPACE} --replicas=1
+                            kubectl patch service app-service -n ${NAMESPACE} -p "{\\"spec\\":{\\"selector\\":{\\"version\\":\\"${params.DEPLOYMENT_TYPE}\\"}}}"
+                            kubectl scale deployment myapp-${oldEnv} -n ${NAMESPACE} --replicas=1
                         """
                     }
                     
@@ -140,7 +139,7 @@ pipeline {
                             kubectl scale deployment myapp-${rollbackEnv} -n ${NAMESPACE} --replicas=3
                             kubectl rollout status deployment/myapp-${rollbackEnv} -n ${NAMESPACE} --timeout=300s
                             
-                            kubectl patch service app-service -n ${NAMESPACE} -p '{"spec":{"selector":{"version":"${rollbackEnv}"}}}'
+                            kubectl patch service app-service -n ${NAMESPACE} -p "{\\"spec\\":{\\"selector\\":{\\"version\\":\\"${rollbackEnv}\\"}}}"
                             
                             kubectl scale deployment myapp-${params.DEPLOYMENT_TYPE} -n ${NAMESPACE} --replicas=0
                         """
