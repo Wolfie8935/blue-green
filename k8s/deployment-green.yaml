@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: myapp
-        image: <YOUR_DOCKER_REGISTRY>/myapp:green
+        image: wolfie8935/myapp:green
         ports:
         - containerPort: 3000
         env:

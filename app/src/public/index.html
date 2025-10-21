@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue-Green Deployment Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Blue Environment Styles */
+        body.blue {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        body.blue .particle {
+            background: rgba(102, 126, 234, 0.5);
+        }
+
+        /* Green Environment Styles */
+        body.green {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        body.green .particle {
+            background: rgba(56, 239, 125, 0.5);
+        }
+
+        /* Animated Background Particles */
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 15s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0) translateX(0);
+                opacity: 0.3;
+            }
+            50% {
+                transform: translateY(-100px) translateX(50px);
+                opacity: 0.6;
+            }
+        }
+
+        .container {
+            text-align: center;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 60px 80px;
+            border-radius: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 4em;
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .environment-badge {
+            display: inline-block;
+            padding: 15px 40px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50px;
+            margin: 20px 0;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .info-box {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 30px;
+            color: white;
+        }
+
+        .info-item {
+            margin: 15px 0;
+            font-size: 1.2em;
+        }
+
+        .info-label {
+            font-weight: bold;
+            opacity: 0.8;
+        }
+
+        .version {
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 20px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            background: #4ade80;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .deployment-info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .deployment-info h3 {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .deployment-info p {
+            line-height: 1.8;
+            opacity: 0.9;
+        }
+
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Blue-Green Deployment</h1>
+        
+        <div class="environment-badge" id="envBadge">
+            <span class="loading"></span> Loading...
+        </div>
+
+        <div class="info-box">
+            <div class="info-item">
+                <span class="status-indicator"></span>
+                <span class="info-label">Status:</span> <span id="status">Active</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Environment:</span> <span id="environment">Loading...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Version:</span> <span id="version">Loading...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Hostname:</span> <span id="hostname">Loading...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Timestamp:</span> <span id="timestamp">Loading...</span>
+            </div>
+        </div>
+
+        <div class="deployment-info">
+            <h3>📦 Deployment Information</h3>
+            <p>
+                This application demonstrates a Blue-Green deployment strategy using Jenkins, 
+                Kubernetes, and Docker. The current active environment is shown above.
+            </p>
+            <p style="margin-top: 15px;">
+                <strong>Blue-Green Deployment</strong> allows zero-downtime updates by maintaining 
+                two identical production environments and switching traffic between them.
+            </p>
+        </div>
+
+        <div class="version">
+            Powered by Kubernetes • Jenkins CI/CD • Docker
+        </div>
+    </div>
+
+    <script>
+        // Create floating particles
+        function createParticles() {
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.width = Math.random() * 100 + 50 + 'px';
+                particle.style.height = particle.style.width;
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 5 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                document.body.appendChild(particle);
+            }
+        }
+
+        // Fetch environment information
+        async function loadEnvironmentInfo() {
+            try {
+                const response = await fetch('/api/info');
+                const data = await response.json();
+                
+                // Update body class based on environment
+                document.body.className = data.environment.toLowerCase();
+                
+                // Update UI elements
+                document.getElementById('envBadge').innerHTML = data.environment.toUpperCase() + ' Environment';
+                document.getElementById('environment').textContent = data.environment.toUpperCase();
+                document.getElementById('version').textContent = data.version;
+                document.getElementById('hostname').textContent = data.hostname;
+                document.getElementById('timestamp').textContent = new Date(data.timestamp).toLocaleString();
+                
+                // Create particles with appropriate color
+                createParticles();
+            } catch (error) {
+                console.error('Error loading environment info:', error);
+                document.getElementById('envBadge').innerHTML = 'Unknown Environment';
+                document.getElementById('environment').textContent = 'Unknown';
+            }
+        }
+
+        // Update timestamp every second
+        setInterval(() => {
+            document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        }, 1000);
+
+        // Load environment info on page load
+        loadEnvironmentInfo();
+    </script>
+</body>
+</html>

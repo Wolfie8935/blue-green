@@ -1,0 +1,15 @@
+{
+  "name": "blue-green-deployment-app",
+  "version": "1.0.0",
+  "description": "Blue-Green Deployment Demo Application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
