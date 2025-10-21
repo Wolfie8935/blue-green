@@ -93,9 +93,10 @@ pipeline {
                     echo "Running smoke tests on ${params.DEPLOYMENT_TYPE} environment..."
                     withKubeConfig([credentialsId: "${KUBECONFIG_CREDENTIALS}"]) {
                         bat """
-                            for /f "delims=" %%i in ('kubectl get pods -n ${NAMESPACE} -l version^=${params.DEPLOYMENT_TYPE} -o jsonpath^="{.items[0].metadata.name}"') do set POD_NAME=%%i
-                            kubectl wait --for^=condition^=ready pod/%%POD_NAME%% -n ${NAMESPACE} --timeout^=120s
-                            kubectl exec %%POD_NAME%% -n ${NAMESPACE} -- curl -f http://localhost:3000/health
+                            for /f "delims=" %%i in ('kubectl get pods -n ${NAMESPACE} -l version^=${params.DEPLOYMENT_TYPE} -o jsonpath^="{.items[0].metadata.name}"') do (
+                                kubectl wait --for^=condition^=ready pod/%%i -n ${NAMESPACE} --timeout^=120s
+                                kubectl exec %%i -n ${NAMESPACE} -- curl -f http://localhost:3000/health
+                            )
                         """
                     }
                 }
